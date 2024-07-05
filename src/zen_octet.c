@@ -327,12 +327,15 @@ octet* o_arg(lua_State *L, int n) {
 
 // allocates a new octet in LUA, duplicating the one in arg
 octet *o_dup(lua_State *L, octet *o) {
-	octet *n = o_new(L, o->len);
+	SAFE(o);
+	register size_t len = o->len;
+	octet *n = o_new(L, len);
 	if(!n) {
 		zerror(L, "Could not create OCTET");
 		return NULL;
 	}
 	OCT_copy(n,o);
+	n->max = len;
 	return(n);
 }
 
@@ -1997,6 +2000,36 @@ static int lesser_than(lua_State *L) {
 	END(1);
 }
 
+static int fuzz_byte(lua_State *L) {
+	BEGIN();
+	octet *o = o_arg(L,1); SAFE(o);
+	if(o->len >= 4294967295) {
+		o_free(L,o);
+		THROW("fuzz_byte: octet too big");
+		END(0);
+	}
+	octet *res = o_dup(L,o);
+	Z(L);
+	if(res->len < 256) {
+		uint8_t point8 = RAND_byte(Z->random_generator);
+		res->val[point8%res->len] = RAND_byte(Z->random_generator);
+	} else if(res->len < 65535) {
+		uint16_t point16 =
+			RAND_byte(Z->random_generator)
+			| (uint32_t) RAND_byte(Z->random_generator) << 8;
+		res->val[point16%res->len] = RAND_byte(Z->random_generator);
+	} else if(res->len < 4294967295) {
+		uint32_t point32 =
+			RAND_byte(Z->random_generator)
+			| (uint32_t) RAND_byte(Z->random_generator) << 8
+			| (uint32_t) RAND_byte(Z->random_generator) << 16
+			| (uint32_t) RAND_byte(Z->random_generator) << 24;
+		res->val[point32%res->len] = RAND_byte(Z->random_generator);
+	}
+	o_free(L,o);
+	END(1);
+}
+
 int luaopen_octet(lua_State *L) {
 	(void)L;
 	const struct luaL_Reg octet_class[] = {
@@ -2055,6 +2088,7 @@ int luaopen_octet(lua_State *L) {
 		{"popcount_hamming", popcount_hamming_distance},
 		{"to_segwit", to_segwit_address},
 		{"from_segwit", from_segwit_address},
+		{"fuzz_byte", fuzz_byte},
 		{NULL,NULL}
 	};
 	const struct luaL_Reg octet_methods[] = {
@@ -2091,6 +2125,7 @@ int luaopen_octet(lua_State *L) {
 		{"compact_ascii", compact_ascii},
 		{"elide_at_start", elide_at_start},
 		{"fillrepeat", fillrepeat},
+		{"fuzz_byte", fuzz_byte},
 		// {"zcash_topoint", zcash_topoint},
 		// idiomatic operators
 		{"__len",size},
