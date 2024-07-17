@@ -1,6 +1,6 @@
-/* This file is part of Zenroom (https://zenroom.dyne.org)
+/* This file is part of Zenroom (https://zenroom.org)
  *
- * Copyright (C) 2017-2021 Dyne.org foundation
+ * Copyright (C) 2017-2024 Dyne.org foundation
  * designed, written and maintained by Denis Roio <jaromil@dyne.org>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -73,7 +73,7 @@
 #include <zen_big.h>
 #include <zen_float.h>
 #include <zen_time.h>
-
+#include <zen_fuzzer.h>
 #include <zen_ecp.h>
 
 #include <math.h> // for log2 in entropy calculation
@@ -2000,36 +2000,6 @@ static int lesser_than(lua_State *L) {
 	END(1);
 }
 
-static int fuzz_byte(lua_State *L) {
-	BEGIN();
-	octet *o = o_arg(L,1); SAFE(o);
-	if(o->len >= 4294967295) {
-		o_free(L,o);
-		THROW("fuzz_byte: octet too big");
-		END(0);
-	}
-	octet *res = o_dup(L,o);
-	Z(L);
-	if(res->len < 256) {
-		uint8_t point8 = RAND_byte(Z->random_generator);
-		res->val[point8%res->len] = RAND_byte(Z->random_generator);
-	} else if(res->len < 65535) {
-		uint16_t point16 =
-			RAND_byte(Z->random_generator)
-			| (uint32_t) RAND_byte(Z->random_generator) << 8;
-		res->val[point16%res->len] = RAND_byte(Z->random_generator);
-	} else if(res->len < 4294967295) {
-		uint32_t point32 =
-			RAND_byte(Z->random_generator)
-			| (uint32_t) RAND_byte(Z->random_generator) << 8
-			| (uint32_t) RAND_byte(Z->random_generator) << 16
-			| (uint32_t) RAND_byte(Z->random_generator) << 24;
-		res->val[point32%res->len] = RAND_byte(Z->random_generator);
-	}
-	o_free(L,o);
-	END(1);
-}
-
 int luaopen_octet(lua_State *L) {
 	(void)L;
 	const struct luaL_Reg octet_class[] = {
@@ -2088,7 +2058,8 @@ int luaopen_octet(lua_State *L) {
 		{"popcount_hamming", popcount_hamming_distance},
 		{"to_segwit", to_segwit_address},
 		{"from_segwit", from_segwit_address},
-		{"fuzz_byte", fuzz_byte},
+		{"fuzz_byte", fuzz_byte_random},
+		{"fuzz_byte_xor", fuzz_byte_xor},
 		{NULL,NULL}
 	};
 	const struct luaL_Reg octet_methods[] = {
@@ -2125,7 +2096,8 @@ int luaopen_octet(lua_State *L) {
 		{"compact_ascii", compact_ascii},
 		{"elide_at_start", elide_at_start},
 		{"fillrepeat", fillrepeat},
-		{"fuzz_byte", fuzz_byte},
+		{"fuzz_byte", fuzz_byte_random},
+		{"fuzz_byte_xor", fuzz_byte_xor},
 		// {"zcash_topoint", zcash_topoint},
 		// idiomatic operators
 		{"__len",size},
