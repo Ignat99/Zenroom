@@ -2000,6 +2000,116 @@ static int lesser_than(lua_State *L) {
 	END(1);
 }
 
+
+void OCT_shl_bits(octet *x, int n) {
+	if (n >= 8 * x->len) { // If shifting more bits than the entire octet length, clear it.
+		x->len = 0;
+		return;
+	}
+	
+	int byte_shift = n / 8;		
+	int bit_shift = n % 8;		
+	int carry_bits = 8 - bit_shift; 
+
+	if (byte_shift > 0) {
+		for (int i = 0; i < x->len- byte_shift; i++)  x->val[i] = x->val[i + byte_shift];
+		 for (int i = x->len - byte_shift; i < x->len; i++)  x->val[i] = 0;
+	}
+	if (bit_shift > 0) {
+		unsigned char carry = 0; 
+		for (int i = x->len-1; i >= 0; i--) {
+			unsigned char current = x->val[i];			  
+			x->val[i] = (current << bit_shift) | carry;
+			carry = (current >> carry_bits) & ((1 << bit_shift) - 1); 
+		}
+	}
+}
+/* Shift octet to the left by n bits. Leftmost bits disappear 
+This is also executed when using the 'o << n' with o an octet and n an integer */
+static int shift_left(lua_State *L) {
+	BEGIN();
+	char *failed_msg = NULL;
+	octet *o = o_arg(L,1); SAFE(o);
+	int isnum;
+	lua_Integer n = lua_tointegerx(L,2,&isnum);
+	if(!isnum) {
+		failed_msg = "shift input is not a number";
+		goto end; 
+	}
+	octet *out = o_new(L,o->len);
+
+	if(!out) {
+		failed_msg = "Could not create OCTET";
+		goto end;
+	}
+	OCT_copy(out, o);
+
+	OCT_shl_bits(out, n);
+	end:
+	o_free(L, o);
+	if(failed_msg) {
+		THROW(failed_msg);
+	}
+	END(1);
+
+
+}
+
+void OCT_shr_bits(octet *x, int n) {
+	if (n >= 8 * x->len) { 
+		x->len = 0;
+		return;
+	}
+	int byte_shift = n / 8;
+	int bit_shift = n % 8;
+	int carry_bits = 8- bit_shift;
+	if (byte_shift > 0) {
+		for (int i = x->len - 1; i >= byte_shift; i--) x->val[i] = x->val[i - byte_shift];
+		for (int i = 0; i < byte_shift; i++) x->val[i] = 0;
+	}
+
+	if (bit_shift > 0) {
+		unsigned char carry = 0;
+		for (int i = 0; i < x->len; i++)
+		{
+			unsigned char current = x->val[i];
+			x->val[i] = (current >> bit_shift) | carry;
+			carry = (current  & ((1 << (bit_shift)) - 1)) << carry_bits;
+		}
+	}
+}
+
+/* Shift octet to the right by n bits. Rightmost bits disappear
+ This is also executed when using the 'o >> n' with o an octet and n an integer */
+static int shift_right(lua_State *L) {
+	BEGIN();
+	char *failed_msg = NULL;
+	octet *o = o_arg(L,1); SAFE(o);
+	int isnum;
+	lua_Integer n = lua_tointegerx(L,2,&isnum);
+	if(!isnum) {
+		failed_msg = "shift input is not a number";
+		goto end; 
+	}
+	octet *out = o_new(L,o->len);
+
+	if(!out) {
+		failed_msg = "Could not create OCTET";
+		goto end;
+	}
+	OCT_copy(out, o);
+
+	OCT_shr_bits(out, n);
+	end:
+	o_free(L, o);
+	if(failed_msg) {
+		THROW(failed_msg);
+	}
+	END(1);
+
+
+}
+
 int luaopen_octet(lua_State *L) {
 	(void)L;
 	const struct luaL_Reg octet_class[] = {
@@ -2060,6 +2170,8 @@ int luaopen_octet(lua_State *L) {
 		{"from_segwit", from_segwit_address},
 		{"fuzz_byte", fuzz_byte_random},
 		{"fuzz_byte_xor", fuzz_byte_xor},
+		{"shl", shift_left},
+		{"shr", shift_right},
 		{NULL,NULL}
 	};
 	const struct luaL_Reg octet_methods[] = {
@@ -2098,6 +2210,8 @@ int luaopen_octet(lua_State *L) {
 		{"fillrepeat", fillrepeat},
 		{"fuzz_byte", fuzz_byte_random},
 		{"fuzz_byte_xor", fuzz_byte_xor},
+		{"shl", shift_left},
+		{"shr", shift_right},
 		// {"zcash_topoint", zcash_topoint},
 		// idiomatic operators
 		{"__len",size},
@@ -2107,6 +2221,8 @@ int luaopen_octet(lua_State *L) {
 		{"__gc", o_destroy},
 		{"__tostring",to_base64},
 		{"__lt",lesser_than},
+		{"__shl", shift_left},
+		{"__shr", shift_right},
 		{NULL,NULL}
 	};
 	zen_add_class(L, "octet", octet_class, octet_methods);
