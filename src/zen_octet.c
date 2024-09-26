@@ -2266,7 +2266,7 @@ static int or_shrink(lua_State *L) {
 		goto end;
 	}
 	OCT_copy(n, x);
-	
+	OCT_or(n, y);
 end:
 	o_free(L, x);
 	o_free(L, y);
