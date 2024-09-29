@@ -285,15 +285,15 @@ jobs:
           sudo apt-get install -qy meson ninja-build
       - name: Install yarn dependencies
         run: |
-          yarn --cwd bindings/javascript
+          yarn
       - name: Build Zenroom Wasm
         run: |
-          yarn --cwd bindings/javascript build
+          yarn build
         env:
           EMSCRIPTEN: ${{ env.EMSDK }}/upstream/emscripten
       - name: 🧪 test bindings node-${{ matrix.node-version }}
         run: |
-          yarn --cwd bindings/javascript test
+          yarn test
       - name: 🔐 check crypto with node-${{ matrix.node-version }}
         working-directory: ./
         run: |
@@ -397,10 +397,10 @@ jobs:
           sudo apt-get install -qy meson ninja-build
       - name: Install yarn dependencies
         run: |
-          yarn --cwd bindings/javascript
+          yarn
       - name: Build Zenroom Wasm
         run: |
-          yarn --cwd bindings/javascript build
+          yarn build
         env:
           EMSCRIPTEN: ${{ env.EMSDK }}/upstream/emscripten
       - uses: actions/upload-artifact@v4
